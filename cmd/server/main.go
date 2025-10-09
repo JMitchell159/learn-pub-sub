@@ -30,6 +30,11 @@ func main() {
 
 	gamelogic.PrintServerHelp()
 
+	_, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilTopic, routing.GameLogSlug, "game_logs.*", pubsub.Durable)
+	if err != nil {
+		log.Printf("error while declaring and binding game logs: %v", err)
+	}
+
 	for {
 		input := gamelogic.GetInput()
 		if len(input) == 0 {
