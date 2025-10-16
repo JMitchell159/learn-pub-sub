@@ -8,7 +8,15 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func SubscribeJSON[T any](conn *amqp.Connection, exchange, queueName, key string, queueType SimpleQueueType, handler func(T)) error {
+type AckType int
+
+const (
+	Ack AckType = iota
+	NackRequeue
+	NackDiscard
+)
+
+func SubscribeJSON[T any](conn *amqp.Connection, exchange, queueName, key string, queueType SimpleQueueType, handler func(T) AckType) error {
 	var v T
 	ch, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -27,11 +35,27 @@ func SubscribeJSON[T any](conn *amqp.Connection, exchange, queueName, key string
 				log.Printf("error while unmarshaling delivery into struct: %v", err)
 			}
 
-			handler(v)
+			ack := handler(v)
 
-			err = d.Ack(false)
-			if err != nil {
-				log.Printf("error while acknowledging delivery: %v", err)
+			switch ack {
+			case Ack:
+				log.Println("Ack")
+				err = d.Ack(false)
+				if err != nil {
+					log.Printf("error while acknowledging delivery: %v", err)
+				}
+			case NackRequeue:
+				log.Println("Nack Requeue")
+				err = d.Nack(false, true)
+				if err != nil {
+					log.Printf("error while negative acknowledging and requeueing: %v", err)
+				}
+			case NackDiscard:
+				log.Println("Nack Discard")
+				err = d.Nack(false, false)
+				if err != nil {
+					log.Printf("error while negative acknowledging and discarding: %v", err)
+				}
 			}
 		}
 	}()
