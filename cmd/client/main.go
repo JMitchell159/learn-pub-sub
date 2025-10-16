@@ -21,6 +21,11 @@ func main() {
 	}
 	defer conn.Close()
 
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Printf("error while creating a channel from connection: %v", err)
+	}
+
 	userName, err := gamelogic.ClientWelcome()
 	if err != nil {
 		log.Printf("error while running client welcome: %v", err)
@@ -38,6 +43,11 @@ func main() {
 		log.Printf("error while subscribing to pause queue: %v", err)
 	}
 
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, fmt.Sprintf("army_moves.%s", userName), routing.ArmyMovesPrefix+".*", pubsub.Transient, handlerArmyMoves(state))
+	if err != nil {
+		log.Printf("error while subscribing to army moves queue: %v", err)
+	}
+
 	for {
 		input := gamelogic.GetInput()
 		if len(input) == 0 {
@@ -48,11 +58,17 @@ func main() {
 		case "spawn":
 			err = state.CommandSpawn(input)
 		case "move":
-			_, err = state.CommandMove(input)
+			move, err := state.CommandMove(input)
 			if err != nil {
 				fmt.Println("Move unsuccessful")
 			} else {
 				fmt.Println("Move successful")
+			}
+			err = pubsub.PublishJSON(ch, routing.ExchangePerilTopic, fmt.Sprintf("army_moves.%s", userName), move)
+			if err != nil {
+				log.Println("publish move unsuccessful")
+			} else {
+				log.Println("publish move successful")
 			}
 		case "status":
 			state.CommandStatus()
