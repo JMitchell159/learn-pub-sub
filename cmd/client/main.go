@@ -17,35 +17,35 @@ func main() {
 	connString := "amqp://guest:guest@localhost:5672/"
 	conn, err := amqp.Dial(connString)
 	if err != nil {
-		log.Printf("error while creating a connection: %v", err)
+		log.Fatalf("error while creating a connection: %v", err)
 	}
 	defer conn.Close()
 
 	ch, err := conn.Channel()
 	if err != nil {
-		log.Printf("error while creating a channel from connection: %v", err)
+		log.Fatalf("error while creating a channel from connection: %v", err)
 	}
 
 	userName, err := gamelogic.ClientWelcome()
 	if err != nil {
-		log.Printf("error while running client welcome: %v", err)
-	}
-
-	_, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, fmt.Sprintf("pause.%s", userName), routing.PauseKey, pubsub.Transient)
-	if err != nil {
-		log.Printf("error while declaring and binding pause queue: %v", err)
+		log.Fatalf("error while running client welcome: %v", err)
 	}
 
 	state := gamelogic.NewGameState(userName)
 
 	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilDirect, fmt.Sprintf("pause.%s", userName), routing.PauseKey, pubsub.Transient, handlerPause(state))
 	if err != nil {
-		log.Printf("error while subscribing to pause queue: %v", err)
+		log.Fatalf("error while subscribing to pause queue: %v", err)
 	}
 
-	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, fmt.Sprintf("army_moves.%s", userName), routing.ArmyMovesPrefix+".*", pubsub.Transient, handlerArmyMoves(state))
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, fmt.Sprintf("army_moves.%s", userName), routing.ArmyMovesPrefix+".*", pubsub.Transient, handlerArmyMoves(state, ch))
 	if err != nil {
-		log.Printf("error while subscribing to army moves queue: %v", err)
+		log.Fatalf("error while subscribing to army moves queue: %v", err)
+	}
+
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, "war", routing.WarRecognitionsPrefix+"."+userName, pubsub.Durable, handlerWar(state))
+	if err != nil {
+		log.Fatalf("error while subscribing to war declarations queue: %v", err)
 	}
 
 	for {
