@@ -20,7 +20,7 @@ func DeclareAndBind(conn *amqp.Connection, exchange, queueName, key string, queu
 	}
 
 	queue, err := ch.QueueDeclare(queueName, queueType == Durable, queueType == Transient, queueType == Transient, false, amqp.Table{
-		"dead-letter-exchange": "peril_dlx",
+		"x-dead-letter-exchange": "peril_dlx",
 	})
 	if err != nil {
 		return ch, amqp.Queue{}, fmt.Errorf("error while declaring queue: %v", err)

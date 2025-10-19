@@ -22,6 +22,11 @@ func Subscribe[T any](conn *amqp.Connection, exchange, queueName, key string, qu
 		return fmt.Errorf("error while declaring and binding queue: %v", err)
 	}
 
+	err = ch.Qos(10, 0, false)
+	if err != nil {
+		return fmt.Errorf("error while setting prefetch: %v", err)
+	}
+
 	delivery, err := ch.Consume(queueName, "", false, false, false, false, nil)
 	if err != nil {
 		return fmt.Errorf("error while consuming channel: %v", err)
