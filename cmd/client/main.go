@@ -43,7 +43,7 @@ func main() {
 		log.Fatalf("error while subscribing to army moves queue: %v", err)
 	}
 
-	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, "war", routing.WarRecognitionsPrefix+"."+userName, pubsub.Durable, handlerWar(state))
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, "war", routing.WarRecognitionsPrefix+"."+userName, pubsub.Durable, handlerWar(state, ch))
 	if err != nil {
 		log.Fatalf("error while subscribing to war declarations queue: %v", err)
 	}
