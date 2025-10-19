@@ -1,7 +1,6 @@
 package pubsub
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 
@@ -16,7 +15,7 @@ const (
 	NackDiscard
 )
 
-func SubscribeJSON[T any](conn *amqp.Connection, exchange, queueName, key string, queueType SimpleQueueType, handler func(T) AckType) error {
+func Subscribe[T any](conn *amqp.Connection, exchange, queueName, key string, queueType SimpleQueueType, handler func(T) AckType, decoder func([]byte) (T, error)) error {
 	var v T
 	ch, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -30,7 +29,7 @@ func SubscribeJSON[T any](conn *amqp.Connection, exchange, queueName, key string
 
 	go func() {
 		for d := range delivery {
-			err = json.Unmarshal(d.Body, &v)
+			v, err = decoder(d.Body)
 			if err != nil {
 				log.Printf("error while unmarshaling delivery into struct: %v", err)
 			}
@@ -58,4 +57,12 @@ func SubscribeJSON[T any](conn *amqp.Connection, exchange, queueName, key string
 	}()
 
 	return nil
+}
+
+func SubscribeJSON[T any](conn *amqp.Connection, exchange, queueName, key string, queueType SimpleQueueType, handler func(T) AckType) error {
+	return Subscribe(conn, exchange, queueName, key, queueType, handler, decodeJSON)
+}
+
+func SubscribeGob[T any](conn *amqp.Connection, exchange, queueName, key string, queueType SimpleQueueType, handler func(T) AckType) error {
+	return Subscribe(conn, exchange, queueName, key, queueType, handler, decodeGob)
 }

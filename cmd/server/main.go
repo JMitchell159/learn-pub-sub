@@ -17,7 +17,7 @@ func main() {
 	connString := "amqp://guest:guest@localhost:5672/"
 	conn, err := amqp.Dial(connString)
 	if err != nil {
-		log.Printf("error while creating a connection: %v", err)
+		log.Fatalf("error while creating a connection: %v", err)
 	}
 	defer conn.Close()
 
@@ -25,15 +25,23 @@ func main() {
 
 	ch, err := conn.Channel()
 	if err != nil {
-		log.Printf("error while creating a channel from connection: %v", err)
+		log.Fatalf("error while creating a channel from connection: %v", err)
+	}
+
+	err = pubsub.SubscribeGob(conn, routing.ExchangePerilTopic, routing.GameLogSlug, routing.GameLogSlug+".*", pubsub.Durable, func(gl routing.GameLog) pubsub.AckType {
+		defer fmt.Print("> ")
+		err := gamelogic.WriteLog(gl)
+		if err != nil {
+			fmt.Printf("Error: %s\n", err)
+			return pubsub.NackRequeue
+		}
+		return pubsub.Ack
+	})
+	if err != nil {
+		log.Fatalf("error while subscribing to game logs: %v", err)
 	}
 
 	gamelogic.PrintServerHelp()
-
-	_, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilTopic, routing.GameLogSlug, "game_logs.*", pubsub.Durable)
-	if err != nil {
-		log.Printf("error while declaring and binding game logs: %v", err)
-	}
 
 	for {
 		input := gamelogic.GetInput()
